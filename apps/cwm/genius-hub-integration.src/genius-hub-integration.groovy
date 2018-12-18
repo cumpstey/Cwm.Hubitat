@@ -32,8 +32,6 @@ definition(
   singleInstance: true
 )
 
-private apiRootUrl() { return 'https://hub-server-1.heatgenius.co.uk/v3/' }
-
 //#region Preferences
 
 preferences {
@@ -87,6 +85,7 @@ def authenticationPage(params) {
     section {
       input 'geniusHubUsername', 'text', title: 'Username', required: true, displayDuringSetup: true
       input 'geniusHubPassword', 'password', title: 'Password', required: true, displayDuringSetup: true
+      input 'geniusHubLocalIp', 'text', title: 'Local IP address for hub', required: false, displayDuringSetup: true
     }
   }
 }
@@ -288,7 +287,7 @@ private void verifyAuthentication() {
   logger "${app.label}: verifyAuthentication", 'trace'
   
   def requestParams = [
-    uri: apiRootUrl(),
+    uri: getApiRootUrl(),
     path: 'auth/test',
     contentType: 'application/json',
     headers: [
@@ -307,7 +306,7 @@ private void verifyAuthentication() {
         logger 'Authentication succeeded'
       }
       else {
-        apiError(response.status, "Unexpected status code: ${response.status}")
+        handleApiError(response)
       }
     }
   } catch (groovyx.net.http.HttpResponseException e) {
@@ -322,7 +321,7 @@ private void fetchZones() {
   logger "${app.label}: fetchZones", 'trace'
  
   def requestParams = [
-    uri: apiRootUrl(),
+    uri: getApiRootUrl(),
     path: 'zones',
     contentType: 'application/json',
     headers: [
@@ -357,7 +356,7 @@ private void fetchZones() {
         state.devices = devices
       }
       else {
-        apiError(response.status, "Unexpected status code: ${response.status}")
+        handleApiError(response)
       }
     }
   } catch (groovyx.net.http.HttpResponseException e) {
@@ -378,7 +377,7 @@ private void fetchZonesAsync(String handler) {
   logger "${app.label}: fetchZonesAsync", 'trace'
 
   def requestParams = [
-    uri: apiRootUrl(),
+    uri: getApiRootUrl(),
     path: "zones",
     contentType: 'application/json',
     headers: [
@@ -404,7 +403,7 @@ private void pushModeAsync(Integer geniusId, String mode) {
   }
 
   def requestParams = [
-    uri: apiRootUrl(),
+    uri: getApiRootUrl(),
     path: "zone/${geniusId}",
     contentType: 'application/json',
     body: [
@@ -428,7 +427,7 @@ private void pushOverridePeriodAsync(Integer geniusId, Integer period) {
   logger "${app.label}: pushOverridePeriodAsync(${geniusId}, ${period})", 'trace'
 
   def requestParams = [
-    uri: apiRootUrl(),
+    uri: getApiRootUrl(),
     path: "zone/${geniusId}",
     contentType: 'application/json',
     body: [
@@ -453,7 +452,7 @@ private void pushRoomTemperatureAsync(Integer geniusId, Double value, Integer ov
   logger "${app.label}: pushRoomTemperatureAsync(${geniusId}, ${value})", 'trace'
 
   def requestParams = [
-    uri: apiRootUrl(),
+    uri: getApiRootUrl(),
     path: "zone/${geniusId}",
     contentType: 'application/json',
     body: [
@@ -479,7 +478,7 @@ private void pushSwitchStateAsync(Integer geniusId, Boolean value, Integer overr
   logger "${app.label}: pushSwitchStateAsync(${geniusId}, ${value})", 'trace'
 
   def requestParams = [
-    uri: apiRootUrl(),
+    uri: getApiRootUrl(),
     path: "zone/${geniusId}",
     contentType: 'application/json',
     body: [
@@ -590,7 +589,7 @@ void revert(Integer geniusId) {
  */
 private void updateAllZonesResponseHandler(response, data) {
   if (response.hasError()) {
-    logger "API error received: ${response.getErrorMessage()}"
+    handleAsyncApiError(response)
     return
   }
 
@@ -636,7 +635,7 @@ private void updateAllZonesResponseHandler(response, data) {
  */
 private void updateZoneResponseHandler(response, data) { 
   if (response.hasError()) {
-    logger "API error received: ${response.getErrorMessage()}"
+    handleAsyncApiError(response)
     return
   }
 
@@ -667,9 +666,49 @@ private void updateZoneResponseHandler(response, data) {
   }
 }
 
-//#endregion
+//#endregion API response handlers
 
 //#region Helpers
+
+private getApiRootUrl() {
+  def apiServer = state.apiServer ?: 'hub-server-1.heatgenius.co.uk'
+  return settings.geniusHubLocalIp
+    ? "http://${settings.geniusHubLocalIp}:1223/v3/"
+    : "https://${apiServer}/v3/"
+}
+
+private void handleAsyncApiError(response) {
+  if (response.status == 308) {
+    // The api proxy server has changed url.
+    logApiServerChange(response.headers['X-Genius-ProxyLocation'])
+    return
+  }
+
+  logApiError(response.status, "API error received: ${response.getErrorMessage()}")
+}
+
+private void handleApiError(response) {
+  if (response.status == 308) {
+    // The api proxy server has changed url.
+    logApiServerChange(response.headers['X-Genius-ProxyLocation'])
+    return
+  }
+
+  logApiError(response.status, "Unexpected status code: ${response.status}")
+}
+
+/**
+ * Handle a url change for the api proxy server.
+ * Update the value in state, and log that the request should be retried.
+ * We can't feasibly automatically retry the request, but mostly it'll be retried
+ * shortly anyhow at which time it should work.
+ */
+private void logApiServerChange(String newServer) {
+  state.apiServer = newServer
+  def message = "API server location changed to ${newServer}. Please retry the request."
+  state.currentError = message
+  logger message, 'info'
+}
 
 private void apiError(statusCode, message) {
   logger "Api error: ${statusCode}; ${message}", 'warn'
