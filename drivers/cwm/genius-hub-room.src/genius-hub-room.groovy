@@ -29,11 +29,12 @@ metadata {
     capability 'Refresh'
     capability 'Sensor'
     capability 'Temperature Measurement'
-    capability 'Thermostat Heating Setpoint'
+    capability 'Thermostat'
+    // capability 'Thermostat Heating Setpoint'
 
-    command 'extraHour'
-    command 'refresh'
-    command 'revert'
+    // command 'extraHour'
+    // command 'refresh'
+    // command 'revert'
 
     attribute 'operatingState', 'enum', ['off', 'timer', 'override', 'footprint']
     attribute 'overrideEndTime', 'date'
@@ -41,6 +42,86 @@ metadata {
 
   preferences {
   }
+}
+
+//#region Thermostat commands
+
+def auto() {
+  revert()
+}
+
+def cool() {
+  // Don't support cooling
+}
+
+def emergencyHeat() {
+  logger "${device.label}: emergencyHeat", 'trace'
+
+  def setpoint = device.currentValue('heatingSetpoint')
+  def valueInCelsius = convertHubScaleToCelsius(setpoint)
+  parent.pushRoomTemperature(state.geniusId, valueInCelsius)
+}
+
+def fanAuto() {
+  // Don't support fan
+}
+
+def fanCirculate() {
+  // Don't support fan
+}
+
+def fanOn() {
+  // Don't support fan
+}
+
+def heat() {
+  emergencyHeat()
+}
+
+def off() {
+  // TODO: override off
+}
+
+def setCoolingSetpoint(Double setpoint) {
+  // Don't support cooling
+}
+
+def setHeatingSetpoint(Double setpoint) {
+  logger "${device.label}: setHeatingSetpoint: ${value}", 'trace'
+
+  sendEvent(name: 'heatingSetpoint', value: value, unit: "°${temperatureScale}")
+  sendEvent(name: 'thermostatSetpoint', value: value, unit: "°${temperatureScale}", displayed: false)
+
+  // TODO: need to send this to Genius Hub, at least in override mode
+}
+
+def setSchedule(schedule) {
+  // Don't support schedule
+}
+
+def setThermostatFanMode(String mode) {
+  // Don't support fan
+}
+
+def setThermostatMode(String mode) {
+  switch (mode) {
+    case 'auto': auto(); break;
+    case 'cool': cool(); break;
+    case 'emergency heat': emergencyHeat(); break;
+    case 'heat': heat(); break;
+    case 'off': off(); break;
+  }
+}
+
+//#endregion Thermostat commands
+
+def installed() {
+  sendEvent(name: 'supportedThermostatFanModes', value: [])
+  sendEvent(name: 'supportedThermostatModes', value: ['auto', 'emergency heat', 'off'])
+  sendEvent(name: 'thermostatMode', value: 'off')
+
+  // TODO: we could pull this back from Genius
+  sendEvent(name: 'thermostatOperatingState', value: 'idle')
 }
 
 //#region Methods called by parent app
@@ -93,6 +174,19 @@ void updateState(Map values) {
     // updated value. Ensure we get the latest value in this way.
     operatingState = values.operatingState
     sendEvent(name: 'operatingState', value: values.operatingState)
+
+    switch (operatingState) {
+      case 'off':
+        sendEvent(name: 'thermostatMode', value: 'off')
+        break;
+      case 'override':
+        sendEvent(name: 'thermostatMode', value: 'emergency heat')
+        break;
+      case 'timer':
+      case 'footprint':
+        sendEvent(name: 'thermostatMode', value: 'auto')
+        break;
+    }
   }
 
   if (values?.containsKey('sensorTemperature')) {
@@ -115,9 +209,12 @@ void updateState(Map values) {
       sendEvent(name: 'overrideEndTimeDisplay', value: "Override ends ${overrideEndTime.format('HH:mm')}", displayed: false)
     }
   } else {
+    def currentTemperature = device.currentValue('temperature')
     sendEvent(name: 'overrideEndTime', value: null, displayed: false)
     sendEvent(name: 'overrideEndTimeDisplay', value: null, displayed: false)
-    sendEvent(name: 'heatingSetpoint', value: device.currentValue('temperature'), unit: "°${temperatureScale}", displayed: false)
+    sendEvent(name: 'heatingSetpoint', value: currentTemperature, unit: "°${temperatureScale}", displayed: false)
+    sendEvent(name: 'thermostatSetpoint', value: currentTemperature, unit: "°${temperatureScale}", displayed: false)
+    // sendEvent(name: 'heatingSetpointRange', value: [currentTemperature, currentTemperature], unit: "°${temperatureScale}", displayed: false)
   }
 }
 
@@ -173,14 +270,16 @@ def revert() {
  *
  * @param value  Target temperature, in either Celsius or Fahrenheit as defined by the SmartThings hub settings.
  */
-def setHeatingSetpoint(Double value) {
-  logger "${device.label}: setHeatingSetpoint: ${value}", 'trace'
+// def setHeatingSetpoint(Double value) {
+//   logger "${device.label}: setHeatingSetpoint: ${value}", 'trace'
 
-  sendEvent(name: 'heatingSetpoint', value: value, unit: "°${temperatureScale}")  
+//   sendEvent(name: 'heatingSetpoint', value: value, unit: "°${temperatureScale}")
+//   sendEvent(name: 'thermostatSetpoint', value: value, unit: "°${temperatureScale}", displayed: false)
+//   // sendEvent(name: 'heatingSetpointRange', value: [value, value], unit: "°${temperatureScale}")
 
-  def valueInCelsius = convertHubScaleToCelsius(value)
-  parent.pushRoomTemperature(state.geniusId, valueInCelsius)
-}
+//   def valueInCelsius = convertHubScaleToCelsius(value)
+//   parent.pushRoomTemperature(state.geniusId, valueInCelsius)
+// }
 
 //#endregion Actions
 

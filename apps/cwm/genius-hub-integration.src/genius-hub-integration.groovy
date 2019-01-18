@@ -594,7 +594,7 @@ private void updateAllZonesResponseHandler(response, data) {
   }
 
   logger "${app.label}: updateAllZonesResponseHandler", 'trace'
-  // logger "updateAllZonesResponseHandler: ${response.json}"
+  logger "All zones response: ${response.json}"
 
   def children = getChildDevices()
   children.each { child ->
@@ -640,7 +640,7 @@ private void updateZoneResponseHandler(response, data) {
   }
 
   logger "${app.label}: updateZoneResponseHandler", 'trace'
-  // logger "updateZoneResponseHandler: ${response.json}"
+  logger "Single zone response: ${response.json}"
 
   def child = getChildDevice("GENIUS-${data.geniusId}")
   if (!child) {
@@ -690,7 +690,7 @@ private void handleAsyncApiError(response) {
 private void handleApiError(response) {
   if (response.status == 308) {
     // The api proxy server has changed url.
-    logApiServerChange(response.headers['X-Genius-ProxyLocation'])
+    logApiServerChange(response.headers['X-Genius-ProxyLocation'].value)
     return
   }
 
