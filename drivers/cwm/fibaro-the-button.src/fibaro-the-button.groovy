@@ -1,6 +1,13 @@
 /**
  *  Fibaro The Button
  *
+ *  Notes
+ *  -----
+ *  I've not used the DoubleTapable capability, because with the possibility of up to 5 taps per button and the
+ *  lack of any consistent way of representing more than 2 taps while using DoubleTapable, the button number
+ *  workaround seemed easier to understand.
+ *
+ *  ---
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
  *
@@ -9,7 +16,6 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
- *
  */
 metadata {
   definition (name: 'Fibaro The Button', namespace: 'cwm', author: 'Neil Cumpstey') {
@@ -61,60 +67,6 @@ def configure() {
 
   def cmds = []
   encap(zwave.batteryV1.batteryGet())
-}
-
-/**
- * Simulates holding the button.
- *
- * @param button  Number of the held button. Must be 1.
- */
-def hold(button) {
-  logger "hold: ${button}", 'trace'
-
-  // Can only hold/release button 1
-  if (button != 1) {
-    logger.warn("Invalid button held: ${button}")
-    return
-  } 
-
-  buttonEvent(1, 'held')
-  statusEvent('Held (virtual)');
-}
-
-/**
- * Simulates pushing the button.
- *
- * @param button  Number of the pushed button. Must be 1-5.
- */
-def push(button) {
-  logger "push: ${button}", 'trace'
-
-  // Can only push buttons 1-5
-  if (button < 1 || button > 5) {
-    logger.warn("Invalid button pushed: ${button}")
-    return
-  }
-
-  buttonEvent(button.toInteger())
-  statusEvent("Pushed ${button} time(s) (virtual)");
-}
-
-/**
- * Simulates releasing the button.
- *
- * @param button  Number of the released button. Must be 1.
- */
-def release(button) {
-  logger "release: ${button}", 'trace'
-
-  // Can only hold/release button 1
-  if (button != 1) {
-    logger.warn("Invalid button released: ${button}")
-    return
-  } 
-
-  buttonEvent(1, 'released')
-  statusEvent('Released (virtual)');
 }
 
 //#endregion Commands
@@ -174,32 +126,25 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
 
   switch (cmd.keyAttributes as Integer) {
     case 0:
-      buttonEvent(1)
-      statusEvent("Pushed once (physical)")
+      sendEvent(name: 'pushed', value: 1, isStateChange: true)
       break
     case 1:
-      buttonEvent(1, "released")
-      statusEvent("Released (physical)")
+      sendEvent(name: 'released', value: 1, isStateChange: true)
       break
     case 2:
-      buttonEvent(1, "held")
-      statusEvent("Held (physical)")
+      sendEvent(name: 'held', value: 1, isStateChange: true)
       break
     case 3:
-      buttonEvent(2)
-      statusEvent("Pushed twice (physical)")
+      sendEvent(name: 'pushed', value: 2, isStateChange: true)
       break
     case 4:
-      buttonEvent(3)
-      statusEvent("Pushed 3 times (physical)")
+      sendEvent(name: 'pushed', value: 3, isStateChange: true)
       break
     case 5:
-      buttonEvent(4)
-      statusEvent("Pushed 4 times (physical)")
+      sendEvent(name: 'pushed', value: 4, isStateChange: true)
       break
     case 6:
-      buttonEvent(5)
-      statusEvent("Pushed 5 times (physical)")
+      sendEvent(name: 'pushed', value: 5, isStateChange: true)
       break
   }
 }
@@ -232,26 +177,6 @@ def zwaveEvent(hubitat.zwave.commands.crc16encapv1.Crc16Encap cmd) {
 //#endregion Z-wave event handling
 
 //#region Helpers
-
-/**
- * Send an event when a button is triggered.
- *
- * @param button  Number of the button.
- * @param action  Button action: [held, pushed, released].
- */
-private void buttonEvent(Integer button, String action = 'pushed') {
-  sendEvent(name: action, value: button, isStateChange: true)
-}
-
-/**
- * Send an event with a status message.
- *
- * @param test  Text of the message
- */
-private void statusEvent(String text) {
-  def time = new Date().format("yyyy-MM-dd HH:mm:ss", location.timeZone)
-  sendEvent(name: "multiStatus", value: "${text} - ${time}" , displayed: false)
-}
 
 /**
  * Encapsulate a command with secure encapsulation.
