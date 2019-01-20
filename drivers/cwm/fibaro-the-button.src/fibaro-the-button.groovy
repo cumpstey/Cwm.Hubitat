@@ -3,9 +3,16 @@
  *
  *  Notes
  *  -----
- *  I've not used the DoubleTapable capability, because with the possibility of up to 5 taps per button and the
- *  lack of any consistent way of representing more than 2 taps while using DoubleTapable, the button number
- *  workaround seemed easier to understand.
+ *
+ *  - I've not used the DoubleTapable capability, because with the possibility of up to 5 taps per button and the
+ *    lack of any consistent way of representing more than 2 taps while using DoubleTapable, the button number
+ *    workaround seemed easier to understand.
+ *
+ *  - The button capabilities and the way the (brilliant!) MQTT bridge works means it's not possible, as far
+ *    as I can figure out, to send button held and released events over MQTT to Home Assistant without some
+ *    quite major rewriting. I'm not prepared to dive into this when the Contact Sensor capability provides
+ *    a trivial workaround - though I do find it slightly annoying, and may remove it in future if I find a
+ *    way to live without it.
  *
  *  ---
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
@@ -22,6 +29,7 @@ metadata {
     capability 'Actuator'
     capability 'Battery'
     capability 'Configuration'
+    capability 'Contact Sensor'
     capability 'HoldableButton' 
     capability 'PushableButton'
     capability 'ReleasableButton'
@@ -42,7 +50,7 @@ metadata {
 //#region Device event handlers
 
 def installed() {
-  sendEvent(name: 'numberOfButtons', value: 5)
+  sendEvent(name: 'numberOfButtons', value: 5, displayed: false, isStateChange: false)
 }
 
 def updated() {
@@ -50,7 +58,7 @@ def updated() {
 
   state.logLevel = settings.logging ? 5 : 2
 
-  sendEvent(name: 'numberOfButtons', value: 5)
+  sendEvent(name: 'numberOfButtons', value: 5, displayed: false, isStateChange: false)
   state.lastUpdated = now()
 }
 
@@ -130,9 +138,11 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
       break
     case 1:
       sendEvent(name: 'released', value: 1, isStateChange: true)
+      sendEvent(name: 'contact', value: 'open')
       break
     case 2:
       sendEvent(name: 'held', value: 1, isStateChange: true)
+      sendEvent(name: 'contact', value: 'closed')
       break
     case 3:
       sendEvent(name: 'pushed', value: 2, isStateChange: true)
