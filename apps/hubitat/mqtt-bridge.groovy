@@ -172,6 +172,13 @@ preferences {
       "held"
     ]
   ],
+  "releasablebutton": [
+    name: "Releasable Button",
+    capability: "capability.releasableButton",
+    attributes: [
+      "released"
+    ]
+  ],
   "doubletapablebutton": [
     name: "DoubleTapable Button",
     capability: "capability.doubleTapableButton",
