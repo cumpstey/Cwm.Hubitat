@@ -204,11 +204,9 @@ preferences {
     name: "Color Control",
     capability: "capability.colorControl",
     attributes: [
-      "color",
-      "hue",
-      "saturation"
+      "color"
     ],
-    action: "actionColorControl"
+    action: "actionColor"
   ],
   "colorTemperature": [
     name: "Color Temperature",
@@ -971,6 +969,12 @@ def updateSubscription() {
 
   CAPABILITY_MAP.each { key, capability ->
     capability["attributes"].each { attribute ->
+
+      // TODO: genericise this.
+      if (attribute == 'color') {
+        attribute = 'hs'
+      }
+
       if (!attributes.containsKey(attribute)) {
         attributes[attribute] = []
       }
@@ -1049,13 +1053,43 @@ def inputHandler(evt) {
     state.ignoreEvent = false;
   }
   else {
+    def body = [
+      name: evt.displayName,
+      value: evt.value,
+      type: evt.name
+    ]
+
+    // TODO: Can these overrides be genericised?
+    if (evt.name == 'color') {
+      body = [
+        name: evt.displayName,
+        value: "${evt.device.currentHue * 3.6},${evt.device.currentSaturation}",
+        type: 'hs'
+      ]
+    }
+
+    // TODO: Should this logic be moved into the bridge?
+    // There's similar logic for the other direction in there.
+    if (evt.name == 'level') {
+      if (evt.value as float == 0 && evt.device.currentSwitch == 'off') {
+        // Shouldn't send level 0 if switch is off, as this can cause confusion
+        log.debug "Not sending level 0 because switch is off"
+        return
+      }
+    }
+
+    // TODO: Can these overrides be genericised?
+    if (evt.name == 'pushed' || evt.name == 'held' || evt.name == 'released' || evt.name == 'doubleTapped') {
+      body = [
+        name: evt.displayName,
+        value: evt.name,
+        type: evt.value
+      ]
+    }
+
     def json = new JsonOutput().toJson([
       path: "/push",
-      body: [
-        name: evt.displayName,
-        value: evt.value,
-        type: evt.name
-      ]
+      body: body,
     ])
 
     log.debug "Forwarding device event to bridge: ${json}"
@@ -1135,19 +1169,11 @@ def actionAudioVolume(device, attribute, value) {
   }
 }
 
-def actionColorControl(device, attribute, value) {
-  switch (attribute) {
-    case "setColor":
-      def values = value.split(',')
-      def colormap = ["hue": values[0] as int, "saturation": values[1] as int]
-      device.setColor(colormap)
-      break
-    case "setHue":
-      device.setHue(value as int)
-      break
-    case "setSaturation":
-      device.setSaturation(value as int)
-      break
+def actionColor(device, attribute, value) {
+  if (attribute == 'hs') {
+    def values = value.split(',')
+    def colormap = ["hue": ((values[0] as float) / 3.6) as float, "saturation": values[1] as float]
+    device.setColor(colormap)
   }
 }
 

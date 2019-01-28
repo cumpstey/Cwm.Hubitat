@@ -8,11 +8,10 @@
  *    lack of any consistent way of representing more than 2 taps while using DoubleTapable, the button number
  *    workaround seemed easier to understand.
  *
- *  - The button capabilities and the way the (brilliant!) MQTT bridge works means it's not possible, as far
- *    as I can figure out, to send button held and released events over MQTT to Home Assistant without some
- *    quite major rewriting. I'm not prepared to dive into this when the Contact Sensor capability provides
- *    a trivial workaround - though I do find it slightly annoying, and may remove it in future if I find a
- *    way to live without it.
+ *  - In order to get more sensible button events sent over MQTT, I've customised the (brilliant!) MQTT bridge.
+ *    Neither Hubitat nor SmartThings have a set of button capabilities which adequately describe the Fibaro The Button
+ *    - they're designed more for a device with multiple physical buttons each of which can be pushed or held, than
+ *    for a device such as this which can be multiple-pushed.
  *
  *  ---
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
@@ -29,7 +28,6 @@ metadata {
     capability 'Actuator'
     capability 'Battery'
     capability 'Configuration'
-    capability 'Contact Sensor'
     capability 'HoldableButton' 
     capability 'PushableButton'
     capability 'ReleasableButton'
@@ -138,11 +136,9 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
       break
     case 1:
       sendEvent(name: 'released', value: 1, isStateChange: true)
-      sendEvent(name: 'contact', value: 'open')
       break
     case 2:
       sendEvent(name: 'held', value: 1, isStateChange: true)
-      sendEvent(name: 'contact', value: 'closed')
       break
     case 3:
       sendEvent(name: 'pushed', value: 2, isStateChange: true)
@@ -218,15 +214,16 @@ private crcEncap(hubitat.zwave.Command cmd) {
 private encap(hubitat.zwave.Command cmd) {
   logger "encap: ${cmd}", 'trace'
 
-  if (zwaveInfo.zw.contains("s")) {
-    secEncap(cmd)
-  } else if (zwaveInfo.cc.contains("56")){
-    crcEncap(cmd)
-  } else {
-    logger "No encapsulation supported for command: ${cmd}", 'warn'
+  // TODO: Figure out how Hubitat supports _sending_ encapsulated commands.
 
+  // if (zwaveInfo.zw.contains("s")) {
+  //   secEncap(cmd)
+  // } else if (zwaveInfo.cc.contains("56")){
+    // crcEncap(cmd)
+  // } else {
+    logger "No encapsulation supported for command: ${cmd}", 'warn'
     cmd.format()
-  }
+  // }
 }
 
 /**
