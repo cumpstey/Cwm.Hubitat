@@ -1080,10 +1080,13 @@ def inputHandler(evt) {
 
     // TODO: Can these overrides be genericised?
     if (evt.name == 'pushed' || evt.name == 'held' || evt.name == 'released' || evt.name == 'doubleTapped') {
+      def type = evt.name == 'pushed' ? 'push'
+               : evt.name == 'doubleTapped' ? 'doubleTap'
+               : 'hold'
       body = [
         name: evt.displayName,
         value: evt.name,
-        type: evt.value
+        type: "${evt.value}/${type}"
       ]
     }
 
