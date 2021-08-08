@@ -206,6 +206,7 @@ preferences {
     attributes: [
       "color"
     ],
+    custom: ["hs"],
     action: "actionColor"
   ],
   "colorTemperature": [
@@ -1019,7 +1020,7 @@ def bridgeHandler(evt) {
   // @NOTE this is stored AWFUL, we need a faster lookup table
   // @NOTE this also has no fast fail, I need to look into how to do that
   CAPABILITY_MAP.each { key, capability ->
-    if (capability["attributes"].contains(json.type)) {
+    if (capability["attributes"].contains(json.type) || capability["custom"]?.contains(json.type)) {
       settings[key].each {device ->
         if (device.displayName == json.name) {
 
@@ -1053,6 +1054,8 @@ def inputHandler(evt) {
     state.ignoreEvent = false;
   }
   else {
+    log.debug "Event: ${evt.displayName} ${evt.name} ${evt.value}"
+
     def body = [
       name: evt.displayName,
       value: evt.value,
